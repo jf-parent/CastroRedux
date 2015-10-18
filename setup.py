@@ -18,7 +18,7 @@ with open('requirements.txt', 'r') as fd:
 
 setup(
     name='castroredux',
-    version='0.1.0',
+    version='0.1.1',
     description="'screencast robot' - a tiny fork of vnc2flv",
     long_description=readme,
     author="Brome-HQ",
@@ -26,6 +26,8 @@ setup(
     url='https://github.com/brome-hq/castroredux',
     packages=[
         'castroredux',
+        'castroredux/tools',
+        'castroredux/tools/vnc2flv'
     ],
     package_dir={'castroredux':
                  'castroredux'},
