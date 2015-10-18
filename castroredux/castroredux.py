@@ -4,7 +4,7 @@ import os
 
 from tools.flvrec import FlvRec
 
-class CastroRedux:
+class CastroRedux(object):
     """CastroRedux vnc to flv recorder
     
     Attributes:
