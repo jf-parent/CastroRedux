@@ -23,7 +23,7 @@ Example
         from castroredux import CastroRedux
 
         c = CastroRedux(
-                    filename = 'out.flv',
+                    'out.flv',
                     host = '192.168.0.12'
                     port = 5900,
                     pwdfile = "/home/user/.vnc/pwd"
