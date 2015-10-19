@@ -7,9 +7,13 @@ try:
 except ImportError:
     from distutils.core import setup
 
-
 with open('README.rst') as readme_file:
     readme = readme_file.read()
+
+requirements = []
+with open('requirements.txt', 'r') as fd:
+    for line in fd:
+        requirements.append(line)
 
 setup(
     name='castroredux',
@@ -27,6 +31,7 @@ setup(
     package_dir={'castroredux':
                  'castroredux'},
     include_package_data=True,
+    install_requires=requirements,
     license="ISCL",
     zip_safe=False,
     keywords='castroredux',
