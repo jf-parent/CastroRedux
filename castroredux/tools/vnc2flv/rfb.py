@@ -11,7 +11,6 @@
 import sys, time, socket
 from struct import pack, unpack
 from d3des import decrypt_passwd, generate_response
-from IPython import embed
 
 
 def byte2bit(s):
