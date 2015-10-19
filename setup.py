@@ -17,7 +17,7 @@ with open('requirements.txt', 'r') as fd:
 
 setup(
     name='castroredux',
-    version='0.1.3',
+    version='0.1.4',
     description="'screencast robot' - a tiny fork of vnc2flv",
     long_description=readme,
     author="Brome-HQ",
