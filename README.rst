@@ -29,8 +29,7 @@ Example
                     pwdfile = "/home/user/.vnc/pwd"
             )
 
-        #Starting vnc2flv in a thread
-        c.start() #this is non blocking
+        c.start()
 
         # other stuff
 
