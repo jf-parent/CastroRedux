@@ -4,6 +4,8 @@
 ##
 ##  Copyright (c) 2009-2010 by Yusuke Shinyama
 ##
+##  Refactoring by brome-hq 2015-2016
+##
 
 import sys, zlib, re
 from struct import pack, unpack
@@ -11,6 +13,7 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+
 from flvscreen import FlvScreen
 
 
@@ -58,7 +61,6 @@ class MultipleRange(object):
                 t += (i2-i1)
         self.ranges.sort()
         self.pos = 0
-        return
 
     def __iter__(self):
         return iter(self.ranges)
@@ -79,20 +81,18 @@ class MultipleRange(object):
             self.pos += 1
         return -1
 
-
 ##  VideoSink
 ##
 class VideoSink(object):
 
-    def __init__(self, clipping=None, debug=0):
-        self.debug = debug
+    def __init__(self, clipping=None, logger = None):
+        self.logger = logger
         self.clipping = clipping
         self.initialized = False
-        return
 
     def init_screen(self, width, height, name=None):
-        if self.debug:
-            print >>sys.stderr, 'init_screen: %dx%d, name=%r' % (width, height, name)
+        if self.logger:
+            self.logger.debug('init_screen: %dx%d, name=%r' % (width, height, name))
         if self.clipping:
             ((xs,x), (ys,y), w, h) = self.clipping
             if xs == '-':
@@ -111,47 +111,41 @@ class VideoSink(object):
     # data is given as ARGB
     def convert_pixels(self, data):
         return data
+
     def convert_color1(self, data):
         return unpack('BBBx', data)
 
     def update_cursor_image(self, width, height, data):
-        if self.debug:
-            print >>sys.stderr, 'update_cursor_image: %dx%d' % (width, height)
-        return
+        if self.logger:
+            self.logger.debug('update_cursor_image: %dx%d' % (width, height))
 
     def update_cursor_pos(self, x, y):
-        if self.debug:
-            print >>sys.stderr, 'update_cursor_pos: (%d,%d)' % (x,y)
-        return
+        if self.logger:
+            self.logger.debug('update_cursor_pos: (%d,%d)' % (x,y))
 
     def update_screen_rgbabits(self, (x, y), (width, height), data):
-        if self.debug:
-            print >>sys.stderr, 'update_screen_rgbabits: %dx%d at (%d,%d)' % (width,height,x,y)
-        return
+        if self.logger:
+            self.logger.debug('update_screen_rgbabits: %dx%d at (%d,%d)' % (width,height,x,y))
 
     def update_screen_solidrect(self, (x, y), (w, h), data):
-        if self.debug:
-            print >>sys.stderr, 'update_screen_solidrect: %dx%d at (%d,%d), color=%r' % (width,height,x,y, color)
-        return
+        if self.logger:
+            self.logger.debug('update_screen_solidrect: %dx%d at (%d,%d), color=%r' % (width,height,x,y, color))
 
     def flush(self, t):
-        if self.debug:
-            print >>sys.stderr, 'flush', t
-        return
+        if self.logger:
+            self.logger.debug('flush: %s'%t)
 
     def close(self):
-        if self.debug:
-            print >>sys.stderr, 'close'
-        return
-
+        if self.logger:
+            self.logger.debug('close')
 
 ##  FLVVideoSink
 ##
 class FLVVideoSink(VideoSink):
 
     def __init__(self, writer, blocksize=32, framerate=15, keyframe=0,
-                 clipping=None, panwindow=None, panspeed=0, debug=0):
-        VideoSink.__init__(self, clipping=clipping, debug=debug)
+                 clipping=None, panwindow=None, panspeed=0, logger = None):
+        VideoSink.__init__(self, clipping=clipping, logger = logger)
         self.writer = writer
         self.blocksize = blocksize
         self.framerate = framerate
@@ -165,7 +159,6 @@ class FLVVideoSink(VideoSink):
         self.windowsize = None
         self.curframe = 0
         self.changes = []
-        return
 
     def init_screen(self, width, height, name=None):
         (x,y, width, height) = VideoSink.init_screen(self, width, height, name=name)
@@ -180,15 +173,14 @@ class FLVVideoSink(VideoSink):
                                (h+self.blocksize-1) / self.blocksize)
         else:
             self.windowsize = (bw, bh)
-        if self.debug:
-            print >>sys.stderr, 'start: %d,%d (%dx%d)' % (x, y, width, height)
+        if self.logger:
+            self.logger.debug('start: %d,%d (%dx%d)' % (x, y, width, height))
         self.writer.set_screen_size(width, height)
         return (x, y, width, height)
 
     def update_screen_rgbabits(self, (x, y), (w, h), data):
         (x0,y0) = self.screenpos
         self.screen.blit_rgba(x-x0, y-y0, w, h, data)
-        return
 
     def flush(self, t):
         # t must be >= 0
@@ -198,7 +190,6 @@ class FLVVideoSink(VideoSink):
             if t < timestamp: break
             self.writer.write_video_frame(timestamp, self.get_update_frame())
             self.curframe += 1
-        return
 
     # write SCREENVIDEOPACKET tag
     def get_update_frame(self):
@@ -214,8 +205,8 @@ class FLVVideoSink(VideoSink):
             changes = set( (bx+x,by+y) for y in xrange(bh) for x in xrange(bw) )
         else:
             changes = set(changes)
-        if self.debug:
-            print >>sys.stderr, 'update(%d): changes=%r' % (self.curframe, len(changes)), sorted(changes)
+        if self.logger:
+            self.logger.debug('update(%d): changes=%r sorted(changes): %s' % (self.curframe, len(changes), sorted(changes)))
         flags = 3  # screenvideo codec
         if key:
             flags |= 0x10
@@ -271,16 +262,14 @@ class FLVVideoSink(VideoSink):
             wy = cy1-h
         return (wx,wy)
 
-
 ##  FLVMovieProcessor
 ##
 class FLVMovieProcessor(object):
 
-    def __init__(self, writer=None, debug=0):
-        self.debug = debug
+    def __init__(self, writer=None, logger = None):
+        self.logger = logger
         self.writer = writer
         self.basetime = 0
-        return
 
     def process_audio_tag(self, audiosink, data):
         flags = ord(data[0])
@@ -293,7 +282,6 @@ class FLVMovieProcessor(object):
             samplesize = 16
         samplestereo = flags & 1
         audiosink.load(data[1:])
-        return
 
     def process_video_tag(self, videosink, data):
         import flvscreen, zlib
@@ -326,7 +314,6 @@ class FLVMovieProcessor(object):
                 data = flvscreen.flv2rgba(w, h, data)
                 changed.append((x,vblocks-y-1))
                 videosink.update_screen_rgbabits((x0, y0), (w, h), data)
-        return
 
     def process_flv(self, parser, audiosink=None, videosink=None, ranges=None):
         timestamp = 0
@@ -358,8 +345,6 @@ class FLVMovieProcessor(object):
             videosink.flush(timestamp)
         self.writer.flush()
         self.writer.add_basetime(timestamp)
-        return
-
 
 # main
 if __name__ == '__main__':
@@ -367,7 +352,7 @@ if __name__ == '__main__':
     from rfb import RFBNetworkClient
     fp = file('out.flv', 'wb')
     writer = FLVWriter(fp)
-    sink = FLVVideoSink(writer, debug=1)
+    sink = FLVVideoSink(writer)
     client = RFBNetworkClient('127.0.0.1', 5900, sink)
     client.open()
     try:

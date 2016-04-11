@@ -3,15 +3,17 @@
 ##  audio.py - mp3 file handling
 ##
 ##  Copyright (c) 2009-2010 by Yusuke Shinyama
+
+##  Refactoring by brome-hq 2015-2016
 ##
 
 import sys
 from struct import pack, unpack
+
 try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
-
 
 ##  MP3Parser
 ##
@@ -32,7 +34,7 @@ SAMPLE_RATE = {
 
 FLV_RATE = { 5500:0x00, 11025:0x04, 22050:0x0a, 44100:0x0c }
 
-def parse_mp3(fp, debug=0):
+def parse_mp3(fp, logger = None):
     if isinstance(fp, str):
         fp = StringIO(fp)
     while 1:
@@ -41,7 +43,8 @@ def parse_mp3(fp, debug=0):
         if x.startswith('TAG'):
             # TAG - ignored
             data = x[3]+fp.read(128-4)
-            if debug: print >>sys.stderr, 'TAG', repr(data)
+            if logger: 
+                self.logger.debug('TAG: %s'%repr(data))
             continue
         elif x.startswith('ID3'):
             # ID3 - ignored
@@ -50,7 +53,8 @@ def parse_mp3(fp, debug=0):
             s = [ ord(c) & 0x7f for c in fp.read(4) ]
             size = (s[0]<<21) | (s[1]<<14) | (s[2]<<7) | s[3]
             data = fp.read(size)
-            if debug: print >>sys.stderr, 'ID3', repr(data)
+            if logger: 
+                self.logger.debug('ID3: %s'%repr(data))
             continue
         h = unpack('>L', x)[0]
         # All sync bits (b31-21) are set?
@@ -100,24 +104,22 @@ def parse_mp3(fp, debug=0):
         if protected:
             # skip 16bit CRC
             fp.read(2)
-        if debug:
-            print >>sys.stderr, 'Frame: bit_rate=%dk, sample_rate=%d, framesize=%d' % \
-                  (bit_rate, sample_rate, framesize)
+        if logger:
+            self.logger.debug('Frame: bit_rate=%dk, sample_rate=%d, framesize=%d' % \
+                  (bit_rate, sample_rate, framesize))
+
         data = x+fp.read(framesize-4)
         yield (nsamples, sample_rate, channels, data)
-    return
-
 
 ##  AudioSink
 ##
 class AudioSink(object):
 
-    def __init__(self, debug=0):
-        self.debug = debug
+    def __init__(self, logger = None):
+        self.logger = logger
         self.frames = []
         self.rate = None
         self.totalsamples = 0
-        return
 
     def __repr__(self):
         return '<AudioSink: frames=%d, samples=%d, rate=%s>' % (len(self.frames), self.totalsamples, self.rate)
@@ -138,7 +140,6 @@ class AudioSink(object):
             stereo = (channels == 0 or channels == 1)
             self.frames.append((self.totalsamples, nsamples, rate, stereo, data))
             self.totalsamples += nsamples
-        return
 
     def get(self, start=0, end=sys.maxint):
         if not self.rate: return
@@ -167,7 +168,6 @@ class AudioSink(object):
             curframe += 1
             cursamples += nsamples
             yield (t, nsamples, rate, stereo, data)
-        return
 
     def put(self, writer, start=0, end=sys.maxint, timestamp=0):
         if not self.rate: return 0
@@ -179,7 +179,6 @@ class AudioSink(object):
             totalsamples += nsamples
             writer.write_audio_frame(t-start+timestamp, chr(flags)+data)
         return int(totalsamples*1000.0 / self.rate + .5)
-
 
 if __name__ == "__main__":
     fp = file(sys.argv[1], 'rb')

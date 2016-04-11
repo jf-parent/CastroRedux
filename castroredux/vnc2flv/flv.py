@@ -3,6 +3,8 @@
 ##  flv.py - reading/writing FLV file format.
 ##
 ##  Copyright (c) 2009-2010 by Yusuke Shinyama
+
+##  Refactoring by brome-hq 2015-2016
 ##
 
 import sys
@@ -101,15 +103,14 @@ def getvalue(fp):
 ##
 class DataParser(object):
 
-    def __init__(self, fp, debug=0):
+    def __init__(self, fp, logger = None):
         self.fp = fp
         self.buff = 0
         self.bpos = 8
-        self.debug = debug
-        return
+        self.logger = logger
 
     def close(self):
-        return
+        pass
 
     # fixed bytes read
 
@@ -148,7 +149,6 @@ class DataParser(object):
 
     def setbuff(self, bpos=8, buff=0):
         (self.bpos, self.buff) = (bpos, buff)
-        return
 
     def readbits(self, bits, signed=False):
         if bits == 0: return 0
@@ -191,18 +191,16 @@ class DataParser(object):
 ##
 class DataWriter(object):
 
-    def __init__(self, fp, debug=0):
+    def __init__(self, fp, logger = None):
         self.fp = fp
         self.bpos = 0
         self.buff = 0
         self.fpstack = []
-        self.debug = debug
-        return
+        self.logger = logger
 
     def push(self):
         self.fpstack.append(self.fp)
         self.fp = StringIO()
-        return
 
     def pop(self):
         assert self.fpstack, 'empty fpstack'
@@ -214,58 +212,50 @@ class DataWriter(object):
     def close(self):
         self.finishbits()
         assert not self.fpstack, 'fpstack not empty'
-        return
 
     # fixed bytes write
 
     def write(self, *args):
         for x in args:
             self.fp.write(x)
-        return
 
     def writeui8(self, *args):
         for x in args:
             self.fp.write(chr(x))
-        return
+
     def writesi8(self, *args):
         for x in args:
             self.fp.write(pack('<b', x))
-        return
 
     def writeui16(self, *args):
         for x in args:
             self.fp.write(pack('<H', x))
-        return
+
     def writeub16(self, *args):
         for x in args:
             self.fp.write(pack('>H', x))
-        return
 
     def writesi16(self, *args):
         for x in args:
             self.fp.write(pack('<h', x))
-        return
 
     def writeub24(self, *args):
         for x in args:
             self.fp.write(pack('>L', x)[1:4])
-        return
 
     def writeui32(self, *args):
         for x in args:
             self.fp.write(pack('<L', x))
-        return
+
     def writeub32(self, *args):
         for x in args:
             self.fp.write(pack('>L', x))
-        return
 
     def writergb(self, (r,g,b)):
         self.writeui8(r,g,b)
-        return
+
     def writergba(self, (r,g,b,a)):
         self.writeui8(r,g,b,a)
-        return
 
     # fixed bits write
     def writebits(self, bits, x, signed=False):
@@ -290,27 +280,21 @@ class DataWriter(object):
                 self.bpos = 0
                 bits -= r                      # cut off the upper r bits
                 x &= (1<<bits)-1
-        return
 
     def finishbits(self):
         if self.bpos:
             self.fp.write(chr(self.buff))
             self.buff = 0
             self.bpos = 0
-        return
 
     # variable length structure
-
     def writestring(self, s):
         assert '\x00' not in s
         self.write(s)
         self.write('\x00')
-        return
 
     def start_tag(self):
         self.push()
-        return
-
 
 ##  FLVParser
 ##
@@ -319,12 +303,11 @@ class FLVParser(DataParser):
     TAG_AUDIO = 8
     TAG_VIDEO = 9
 
-    def __init__(self, fp, debug=0):
-        DataParser.__init__(self, fp, debug=debug)
+    def __init__(self, fp, logger = None):
+        DataParser.__init__(self, fp, logger = logger)
         self.tags = []
         self.parse_header()
         self.parse_tags()
-        return
 
     def parse_header(self):
         (F,L,V,ver) = self.read(4)
@@ -334,15 +317,14 @@ class FLVParser(DataParser):
         self.has_audio = bool(flags & 4)
         self.has_video = bool(flags & 1)
         offset = self.readub32()
-        if self.debug:
-            print >>sys.stderr, 'Header:', (F,L,V,self.flv_version,flags)
-        return
+        if self.logger:
+            self.logger.debug('Header:%s %s %s %s'%(F,L,V,self.flv_version,flags))
 
     def parse_metadata(self, data):
         fp = StringIO(data)
         (k,v) = (getvalue(fp), getvalue(fp))
-        if self.debug:
-            print >>sys.stderr, 'Metadata:', (k,v)
+        if self.logger:
+            self.logger.debug('Metadata: %s %s'%(k,v))
         return (k,v)
 
     def parse_tags(self):
@@ -361,14 +343,13 @@ class FLVParser(DataParser):
                 self.fp.seek(offset + length + 4)  # skip PreviousTagSize
         except EOFError:
             pass
-        if self.debug:
-            print >>sys.stderr, 'Tags:', len(self.tags)
-        return
+
+        if self.logger:
+            self.logger.debug('Tags len: %s'%len(self.tags))
 
     def dump(self):
         for (tag, length, timestamp, offset, keyframe) in self.tags:
             print 'tag=%d, length=%d, timestamp=%.03f, keyframe=%r' % (tag, length, timestamp*.001, keyframe)
-        return
 
     def __len__(self):
         return len(self.tags)
@@ -404,7 +385,6 @@ class FLVParser(DataParser):
                 i1 = i
         return i0
 
-
 ##  FLVWriter
 ##
 ##  Originally contributed by Luis Fernando <lfkpoa-69@yahoo.com.br>
@@ -417,12 +397,15 @@ class FLVWriter(DataWriter):
 
     def __init__(self, fp, flv_version=1,
                  has_video=True, has_audio=False, has_other=False,
-                 framerate=12, debug=0):
-        DataWriter.__init__(self, fp, debug=debug)
+                 framerate=12, logger = None):
+
+        DataWriter.__init__(self, fp, logger = logger)
+
         self.flv_version = flv_version
         self.has_video = has_video
         self.has_audio = has_audio
         self.has_other = has_other
+        self.logger = logger
         self.frames = {}
         self.basetime = 0
         self.duration = 0
@@ -437,7 +420,6 @@ class FLVWriter(DataWriter):
             self.metadata['audiocodecid'] = 2
             self.frames[1] = []
         self.write_header()
-        return
 
     def write_object(self, obj):
         if isinstance(obj, bool):
@@ -461,12 +443,13 @@ class FLVWriter(DataWriter):
                 assert isinstance(k, str)
                 self.write(pack('>H', len(k))+k)
                 self.write_object(v)
-        return
 
     def write_header(self):
-        if self.debug:
-            print >>sys.stderr, ('write_header: flv_version=%r, audio=%r, video=%r' %
-                                 (self.flv_version, self.has_audio, self.has_video))
+        if self.logger:
+            self.logger.debug(
+                'write_header: flv_version=%r, audio=%r, video=%r' %
+               (self.flv_version, self.has_audio, self.has_video))
+
         self.write('FLV%c' % self.flv_version)
         self.writebits(5,0)
         self.writebits(1,int(self.has_audio))
@@ -477,17 +460,15 @@ class FLVWriter(DataWriter):
         self.writeub32(0) # previous tag size = 0
         self.metadata_pos = self.fp.tell()
         self.write_metadata()
-        return
 
     def write_metadata(self):
-        if self.debug:
-            print >>sys.stderr, 'write_metadata:', self.metadata
+        if self.logger:
+            self.logger.debug('write_metadata: %s'%self.metadata)
         self.start_tag()
         self.write_object('onMetaData')
         self.write_object(self.metadata)
         self.write('\x00\x00\x09')
         self.end_tag(self.TAG_DATA)
-        return
 
     def end_tag(self, tag, timestamp=None):
         data = self.pop()
@@ -499,32 +480,28 @@ class FLVWriter(DataWriter):
         self.writeui32(0)   # reserved
         self.write(data)
         self.writeub32(len(data)+11)  #size of this tag
-        return
 
     def write_video_frame(self, timestamp, data):
         if not self.has_video: return
-        if self.debug:
-            print >>sys.stderr, 'write_video_frame: timestamp=%d, data=%d' % (timestamp, len(data))
+        if self.logger:
+            self.logger.debug('write_video_frame: timestamp=%d, data=%d' % (timestamp, len(data)))
         self.frames[0].append((timestamp, self.TAG_VIDEO, data))
         self._update()
-        return
 
     def write_audio_frame(self, timestamp, data):
         if not self.has_audio: return
-        if self.debug:
-            print >>sys.stderr, 'write_audio_frame: timestamp=%d, data=%d' % (timestamp, len(data))
+        if self.logger:
+            self.logger.debug('write_audio_frame: timestamp=%d, data=%d' % (timestamp, len(data)))
         self.frames[1].append((timestamp, self.TAG_AUDIO, data))
         self._update()
-        return
 
     def write_other_data(self, tag, data):
         if not self.has_other: return
-        if self.debug:
-            print >>sys.stderr, 'write_other_data: tag=%d, data=%d' % (tag, len(data))
+        if self.logger:
+            self.logger.debug('write_other_data: tag=%d, data=%d' % (tag, len(data)))
         self.start_tag()
         self.write(data)
         self.end_tag(tag)
-        return
 
     def _update(self):
         while 1:
@@ -543,31 +520,27 @@ class FLVWriter(DataWriter):
             self.start_tag()
             self.write(data)
             self.end_tag(tag, timestamp)
-        return
 
     def set_screen_size(self, width, height):
-        if self.debug:
-            print >>sys.stderr, 'set_screen_size: %dx%d' % (width, height)
+        if self.logger:
+            self.logger.debug('set_screen_size: %dx%d' % (width, height))
         self.metadata['width'] = width
         self.metadata['height'] = height
-        return
 
     def add_basetime(self, t):
-        if self.debug:
-            print >>sys.stderr, 'add_basetime: %d+%d' % (self.basetime, t)
+        if self.logger:
+            self.logger.debug('add_basetime: %d+%d' % (self.basetime, t))
         self.basetime += t
-        return
 
     def flush(self):
-        if self.debug:
-            print >>sys.stderr, 'flush'
+        if self.logger:
+            self.logger.debug('flush')
         for frames in self.frames.itervalues():
             while frames:
                 (timestamp, tag, data) = frames.pop(0)
                 self.start_tag()
                 self.write(data)
                 self.end_tag(tag, timestamp)
-        return
 
     def close(self):
         self.flush()
@@ -578,8 +551,6 @@ class FLVWriter(DataWriter):
         self.fp.seek(self.metadata_pos)
         self.write_metadata()
         self.fp.flush()
-        return
-
 
 # test
 if __name__ == "__main__": pass

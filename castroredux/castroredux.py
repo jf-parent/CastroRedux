@@ -2,7 +2,7 @@
 
 import os
 
-from tools.flvrec import FlvRec
+from flvrec import FlvRec
 
 class CastroRedux(object):
     """CastroRedux vnc to flv recorder
@@ -25,7 +25,9 @@ class CastroRedux(object):
                  framerate = 12,
                  keyframe = 120,
                  clipping = None,
-                 debug = False):
+                 logger_name = "CastroRedux",
+                 logger_log_dir = False,
+                 logger_level = "INFO"):
 
         self.outfile_file = outfile_file
         self.host = host
@@ -34,7 +36,9 @@ class CastroRedux(object):
         self.keyframe = keyframe
         self.clipping = clipping
         self.pwdfile = pwdfile
-        self.debug = debug
+        self.logger_level = logger_level
+        self.logger_name = logger_name
+        self.logger_log_dir = logger_log_dir
 
     def start(self):
         """Start the recorder
@@ -48,7 +52,9 @@ class CastroRedux(object):
                             keyframe = self.keyframe,
                             pwdfile = self.pwdfile,
                             clipping = self.clipping,
-                            debug =self.debug
+                            logger_name = self.logger_name,
+                            logger_log_dir = self.logger_log_dir,
+                            logger_level = self.logger_level
                         )
 
         self.recorder.start()

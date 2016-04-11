@@ -2,22 +2,14 @@
 # -*- coding: utf-8 -*-
 
 
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from distutils.core import setup, Extension
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
-requirements = []
-with open('requirements.txt', 'r') as fd:
-    for line in fd:
-        requirements.append(line)
-
 setup(
     name='castroredux',
-    version='0.1.4',
+    version='0.1.5',
     description="'screencast robot' - a tiny fork of vnc2flv",
     long_description=readme,
     author="Brome-HQ",
@@ -25,15 +17,11 @@ setup(
     url='https://github.com/brome-hq/castroredux',
     packages=[
         'castroredux',
-        'castroredux/tools',
-        'castroredux/tools/vnc2flv'
+        'castroredux/vnc2flv'
     ],
     package_dir={'castroredux':
                  'castroredux'},
-    include_package_data=True,
-    install_requires=requirements,
     license="ISCL",
-    zip_safe=False,
     keywords='castroredux',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
@@ -42,5 +30,12 @@ setup(
         'Natural Language :: English',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
-    ]
+    ],
+    ext_modules=[Extension('flvscreen',
+                         ['flvscreen/flvscreen.c'],
+                         #define_macros=[],
+                         #include_dirs=[],
+                         #library_dirs=[],
+                         #libraries=[],
+                         )]
 )
