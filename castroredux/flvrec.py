@@ -105,7 +105,7 @@ class FlvRec(threading.Thread):
                 try:
                     self.client.idle()
                 except RFBError as e:
-                    self.logger.error("[vnc2flv] RFB erro: %s"%unicode(e))
+                    self.logger.error("[vnc2flv] RFB error: %s"%unicode(e))
                     sleep(1)
 
             self.is_recording = False
