@@ -102,7 +102,11 @@ class FlvRec(threading.Thread):
 
             self.is_recording = True
             while self.keep_recording:
-                self.client.idle()
+                try:
+                    self.client.idle()
+                except RFBError as e:
+                    self.logger.error("[vnc2flv] RFB erro: %s"%unicode(e))
+                    sleep(1)
 
             self.is_recording = False
 
@@ -112,13 +116,6 @@ class FlvRec(threading.Thread):
             self.logger.error("[vnc2flv] Socket traceback: %s"%unicode(tb))
             self.stop()
             raise Exception("[vnc2flv] Socket error: %s"%unicode(e))
-
-        except RFBError as e:
-            self.is_recording = False
-            tb = traceback.format_exc()
-            self.logger.error("[vnc2flv] RFB traceback: %s"%unicode(tb))
-            self.stop()
-            raise Exception("[vnc2flv] RFB error: %s"%unicode(e))
 
     def stop(self):
         self.logger.info('[vnc2flv] Stop recording...')
